@@ -1,0 +1,72 @@
+name: Release
+
+# Push a tag like v1.0.0 to build the plugin and publish it to the plugin repository.
+# Jellyfin repository URL:
+#   https://github.com/<owner>/<repo>/releases/latest/download/manifest.json
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+env:
+  TARGET_ABI: '12.0.0.0'
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Determine version
+        id: version
+        run: |
+          v="${GITHUB_REF_NAME#v}"
+          # Jellyfin plugin versions have four parts.
+          while [ "$(echo "$v" | tr -cd '.' | wc -c)" -lt 3 ]; do v="$v.0"; done
+          echo "version=$v" >> "$GITHUB_OUTPUT"
+
+      - name: Build
+        run: >
+          dotnet publish Jellyfin.Plugin.NoSeasonParsing/Jellyfin.Plugin.NoSeasonParsing.csproj
+          -c Release -o out
+          -p:AssemblyVersion=${{ steps.version.outputs.version }}
+          -p:FileVersion=${{ steps.version.outputs.version }}
+
+      - name: Package
+        id: package
+        run: |
+          zip="no-season-parsing_${{ steps.version.outputs.version }}.zip"
+          (cd out && zip -j "../$zip" Jellyfin.Plugin.NoSeasonParsing.dll)
+          echo "zip=$zip" >> "$GITHUB_OUTPUT"
+          echo "checksum=$(md5sum "$zip" | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
+
+      - name: Update manifest
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # Keep older versions by starting from the previous release's manifest.
+          gh release download --repo "$GITHUB_REPOSITORY" --pattern manifest.json || true
+          python3 build/update_manifest.py manifest.json \
+            "${{ steps.version.outputs.version }}" \
+            "$TARGET_ABI" \
+            "https://github.com/${GITHUB_REPOSITORY}/releases/download/${GITHUB_REF_NAME}/${{ steps.package.outputs.zip }}" \
+            "${{ steps.package.outputs.checksum }}" \
+            "Release ${GITHUB_REF_NAME}"
+          cat manifest.json
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >
+          gh release create "$GITHUB_REF_NAME"
+          --repo "$GITHUB_REPOSITORY"
+          --title "$GITHUB_REF_NAME"
+          --generate-notes
+          "${{ steps.package.outputs.zip }}" manifest.json

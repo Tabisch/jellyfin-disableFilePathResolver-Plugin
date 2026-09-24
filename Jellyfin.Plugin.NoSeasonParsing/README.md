@@ -9,7 +9,14 @@ Standalone plugin: bypasses Jellyfin's filename-based season/episode detection f
 ## Build
     dotnet publish -c Release -o out
 
-## Install
+## Install from repository
+1. Dashboard -> Plugins -> Repositories -> add
+   `https://github.com/Tabisch/jellyfin-disableFilePathResolver-Plugin/releases/latest/download/manifest.json`
+2. Catalog -> No Season Parsing -> Install, then restart Jellyfin
+
+To publish a new version, push a tag like `v1.0.1`; the Release workflow builds it and updates the manifest.
+
+## Install manually
 1. Copy `out/Jellyfin.Plugin.NoSeasonParsing.dll` to `<jellyfin-config>/plugins/NoSeasonParsing_1.0.0.0/`
 2. Restart Jellyfin
 3. Dashboard -> Plugins -> No Season Parsing: add your folder(s)
