@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>No Season Parsing</title>
+</head>
+<body>
+<div id="NoSeasonParsingConfigPage" data-role="page" class="page type-interior pluginConfigurationPage"
+     data-require="emby-input,emby-button,emby-select,emby-textarea">
+    <div data-role="content">
+        <div class="content-primary">
+            <form id="NoSeasonParsingConfigForm">
+                <div class="inputContainer">
+                    <label class="textareaLabel" for="Paths">Folders without season parsing (one per line)</label>
+                    <textarea is="emby-textarea" id="Paths" rows="5"></textarea>
+                    <div class="fieldDescription">Paths as Jellyfin sees them, e.g. /media/youtube</div>
+                </div>
+                <div class="selectContainer">
+                    <label class="selectLabel" for="SeasonMode">Season assignment</label>
+                    <select is="emby-select" id="SeasonMode">
+                        <option value="Year">Year (premiere date, else file date)</option>
+                        <option value="Fixed">Fixed season number</option>
+                    </select>
+                </div>
+                <div class="inputContainer">
+                    <label class="inputLabel inputLabelUnfocused" for="FixedSeason">Fixed season number</label>
+                    <input is="emby-input" type="number" id="FixedSeason" min="0" />
+                </div>
+                <button is="emby-button" type="submit" class="raised button-submit block">
+                    <span>Save</span>
+                </button>
+            </form>
+        </div>
+    </div>
+    <script type="text/javascript">
+        var NoSeasonParsing = { pluginId: 'b6f3c2a4-7d1e-4f8a-9c3b-2e5d8a1f4c70' };
+
+        document.querySelector('#NoSeasonParsingConfigPage').addEventListener('pageshow', function () {
+            Dashboard.showLoadingMsg();
+            ApiClient.getPluginConfiguration(NoSeasonParsing.pluginId).then(function (config) {
+                document.querySelector('#Paths').value = (config.Paths || []).join('\n');
+                document.querySelector('#SeasonMode').value = config.SeasonMode || 'Year';
+                document.querySelector('#FixedSeason').value = config.FixedSeason;
+                Dashboard.hideLoadingMsg();
+            });
+        });
+
+        document.querySelector('#NoSeasonParsingConfigForm').addEventListener('submit', function (e) {
+            Dashboard.showLoadingMsg();
+            ApiClient.getPluginConfiguration(NoSeasonParsing.pluginId).then(function (config) {
+                config.Paths = document.querySelector('#Paths').value
+                    .split('\n').map(function (s) { return s.trim(); }).filter(Boolean);
+                config.SeasonMode = document.querySelector('#SeasonMode').value;
+                config.FixedSeason = parseInt(document.querySelector('#FixedSeason').value, 10) || 1;
+                ApiClient.updatePluginConfiguration(NoSeasonParsing.pluginId, config)
+                    .then(Dashboard.processPluginConfigurationUpdateResult);
+            });
+            e.preventDefault();
+            return false;
+        });
+    </script>
+</div>
+</body>
+</html>
