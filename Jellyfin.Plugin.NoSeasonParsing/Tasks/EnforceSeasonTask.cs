@@ -1,39 +1,33 @@
 using System;
-using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Jellyfin.Data.Enums;
+using Jellyfin.Plugin.NoSeasonParsing.Services;
 using MediaBrowser.Controller.Entities;
 using MediaBrowser.Controller.Entities.TV;
 using MediaBrowser.Controller.Library;
-using MediaBrowser.Controller.Providers;
-using MediaBrowser.Model.IO;
 using Microsoft.Extensions.Logging;
 
 namespace Jellyfin.Plugin.NoSeasonParsing.Tasks;
 
 /// <summary>
-/// Safety net after every library scan: Jellyfin can re-parse the path during metadata
-/// refresh (FillMissingEpisodeNumbersFromPath). This task puts the configured season back
-/// and re-refreshes the affected shows so their season folders are rebuilt.
+/// Safety net after every library scan: checks all episodes in configured folders and puts the
+/// configured season back, including episodes that existed before the plugin was installed.
 /// </summary>
 public class EnforceSeasonTask : ILibraryPostScanTask
 {
     private readonly ILibraryManager _libraryManager;
-    private readonly IProviderManager _providerManager;
-    private readonly IFileSystem _fileSystem;
+    private readonly SeasonEnforcer _enforcer;
     private readonly ILogger<EnforceSeasonTask> _logger;
 
     public EnforceSeasonTask(
         ILibraryManager libraryManager,
-        IProviderManager providerManager,
-        IFileSystem fileSystem,
+        SeasonEnforcer enforcer,
         ILogger<EnforceSeasonTask> logger)
     {
         _libraryManager = libraryManager;
-        _providerManager = providerManager;
-        _fileSystem = fileSystem;
+        _enforcer = enforcer;
         _logger = logger;
     }
 
@@ -52,42 +46,23 @@ public class EnforceSeasonTask : ILibraryPostScanTask
                 Recursive = true
             })
             .OfType<Episode>()
-            // Respect items the user locked in the metadata editor.
-            .Where(e => !e.IsLocked && config.Matches(e.Path))
+            .Where(e => config.Matches(e.Path))
             .ToList();
 
-        var touchedSeries = new HashSet<Guid>();
+        var fixedCount = 0;
 
         for (var i = 0; i < episodes.Count; i++)
         {
             cancellationToken.ThrowIfCancellationRequested();
 
-            var ep = episodes[i];
-            var wanted = SeasonCalculator.Get(config, ep.PremiereDate, ep.Path);
-
-            if (wanted.HasValue && ep.ParentIndexNumber != wanted)
+            if (await _enforcer.FixAsync(episodes[i], cancellationToken).ConfigureAwait(false))
             {
-                _logger.LogInformation("Season {Old} -> {New}: {Path}", ep.ParentIndexNumber, wanted, ep.Path);
-                ep.ParentIndexNumber = wanted;
-                await ep.UpdateToRepositoryAsync(ItemUpdateType.MetadataEdit, cancellationToken).ConfigureAwait(false);
-
-                if (!ep.SeriesId.Equals(Guid.Empty))
-                {
-                    touchedSeries.Add(ep.SeriesId);
-                }
+                fixedCount++;
             }
 
-            progress.Report(100.0 * (i + 1) / Math.Max(episodes.Count, 1));
+            progress.Report(100.0 * (i + 1) / episodes.Count);
         }
 
-        foreach (var seriesId in touchedSeries)
-        {
-            _providerManager.QueueRefresh(
-                seriesId,
-                new MetadataRefreshOptions(new DirectoryService(_fileSystem)),
-                RefreshPriority.Normal);
-        }
-
-        _logger.LogInformation("No Season Parsing: fixed {Count} show(s)", touchedSeries.Count);
+        _logger.LogInformation("No Season Parsing: checked {Checked} episode(s), fixed {Fixed}", episodes.Count, fixedCount);
     }
 }
