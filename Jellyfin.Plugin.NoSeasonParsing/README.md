@@ -2,10 +2,12 @@
 
 Standalone plugin: bypasses Jellyfin's filename-based season/episode detection for selected folders.
 
+## Requirements
+- Jellyfin 12.0 or newer
+- .NET 10 SDK (to build)
+
 ## Build
     dotnet publish -c Release -o out
-
-Set `TargetFramework` and `JellyfinVersion` in the .csproj to match your server first.
 
 ## Install
 1. Copy `out/Jellyfin.Plugin.NoSeasonParsing.dll` to `<jellyfin-config>/plugins/NoSeasonParsing_1.0.0.0/`

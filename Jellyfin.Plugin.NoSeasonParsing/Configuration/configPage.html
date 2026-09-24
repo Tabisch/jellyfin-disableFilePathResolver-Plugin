@@ -51,7 +51,9 @@
                 config.Paths = document.querySelector('#Paths').value
                     .split('\n').map(function (s) { return s.trim(); }).filter(Boolean);
                 config.SeasonMode = document.querySelector('#SeasonMode').value;
-                config.FixedSeason = parseInt(document.querySelector('#FixedSeason').value, 10) || 1;
+                var fixedSeason = parseInt(document.querySelector('#FixedSeason').value, 10);
+                // 0 is valid (Specials), so only fall back to 1 when the field is empty/invalid.
+                config.FixedSeason = isNaN(fixedSeason) || fixedSeason < 0 ? 1 : fixedSeason;
                 ApiClient.updatePluginConfiguration(NoSeasonParsing.pluginId, config)
                     .then(Dashboard.processPluginConfigurationUpdateResult);
             });

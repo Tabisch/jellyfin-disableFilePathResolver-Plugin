@@ -1,9 +1,9 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <!-- Match the .NET version and package version of your Jellyfin server (12.0). -->
-    <TargetFramework>net9.0</TargetFramework>
-    <JellyfinVersion>10.11.*</JellyfinVersion>
+    <!-- Jellyfin 12.x is built on .NET 10. -->
+    <TargetFramework>net10.0</TargetFramework>
+    <JellyfinVersion>12.0.*</JellyfinVersion>
     <Nullable>enable</Nullable>
     <AssemblyVersion>1.0.0.0</AssemblyVersion>
     <FileVersion>1.0.0.0</FileVersion>

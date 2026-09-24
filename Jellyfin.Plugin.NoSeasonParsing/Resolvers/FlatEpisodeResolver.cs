@@ -1,11 +1,13 @@
 using System;
-using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using Emby.Naming.Common;
+using Emby.Naming.Video;
 using MediaBrowser.Controller.Entities;
 using MediaBrowser.Controller.Entities.TV;
 using MediaBrowser.Controller.Library;
 using MediaBrowser.Controller.Resolvers;
+using MediaBrowser.Model.Entities;
 
 namespace Jellyfin.Plugin.NoSeasonParsing.Resolvers;
 
@@ -16,10 +18,12 @@ namespace Jellyfin.Plugin.NoSeasonParsing.Resolvers;
 /// </summary>
 public class FlatEpisodeResolver : IItemResolver
 {
-    private static readonly HashSet<string> VideoExtensions = new(StringComparer.OrdinalIgnoreCase)
+    private readonly NamingOptions _namingOptions;
+
+    public FlatEpisodeResolver(NamingOptions namingOptions)
     {
-        ".mp4", ".mkv", ".webm", ".m4v", ".mov", ".avi"
-    };
+        _namingOptions = namingOptions;
+    }
 
     public ResolverPriority Priority => ResolverPriority.Plugin;
 
@@ -36,14 +40,22 @@ public class FlatEpisodeResolver : IItemResolver
             return null;
         }
 
-        if (!VideoExtensions.Contains(Path.GetExtension(args.Path)))
+        // Uses Jellyfin's own list of video extensions; parseName: false keeps the filename untouched.
+        var videoInfo = VideoResolver.Resolve(args.Path, false, _namingOptions, parseName: false);
+        if (videoInfo is null || videoInfo.IsStub || videoInfo.ExtraType is not null)
         {
+            // Not a video, or a trailer/extra -> leave it to Jellyfin.
             return null;
         }
 
         var parent = args.Parent;
-        var season = parent as Season;
-        var series = parent as Series ?? season?.Series ?? parent?.GetParents().OfType<Series>().FirstOrDefault();
+        if (parent is null)
+        {
+            return null;
+        }
+
+        var season = parent as Season ?? parent.GetParents().OfType<Season>().FirstOrDefault();
+        var series = parent as Series ?? season?.Series ?? parent.GetParents().OfType<Series>().FirstOrDefault();
         if (series is null)
         {
             // Not inside a show -> leave it to Jellyfin.
@@ -53,7 +65,10 @@ public class FlatEpisodeResolver : IItemResolver
         var episode = new Episode
         {
             Path = args.Path,
-            Name = Path.GetFileNameWithoutExtension(args.Path),
+            Name = videoInfo.Name,
+            VideoType = string.Equals(videoInfo.Container, "iso", StringComparison.OrdinalIgnoreCase)
+                ? VideoType.Iso
+                : VideoType.VideoFile,
             ParentIndexNumber = SeasonCalculator.Get(config, null, args.Path),
             SeriesId = series.Id,
             SeriesName = series.Name

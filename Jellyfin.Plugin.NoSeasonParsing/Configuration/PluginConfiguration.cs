@@ -30,10 +30,13 @@ public class PluginConfiguration : BasePluginConfiguration
             return false;
         }
 
+        // Windows paths are case-insensitive.
+        var comparison = OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
+
         return Paths
             .Where(p => !string.IsNullOrWhiteSpace(p))
             .Select(p => p.Trim().TrimEnd('/', '\\'))
-            .Any(p => path.StartsWith(p + Path.DirectorySeparatorChar, StringComparison.Ordinal)
-                      || path.StartsWith(p + "/", StringComparison.Ordinal));
+            .Any(p => path.StartsWith(p + Path.DirectorySeparatorChar, comparison)
+                      || path.StartsWith(p + "/", comparison));
     }
 }

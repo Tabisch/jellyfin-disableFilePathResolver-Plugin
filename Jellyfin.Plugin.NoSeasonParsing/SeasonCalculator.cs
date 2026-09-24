@@ -6,7 +6,7 @@ namespace Jellyfin.Plugin.NoSeasonParsing;
 
 internal static class SeasonCalculator
 {
-    public static int? Get(PluginConfiguration config, DateTime? premiereDate, string path)
+    public static int? Get(PluginConfiguration config, DateTime? premiereDate, string? path)
     {
         if (config.SeasonMode == SeasonMode.Fixed)
         {
@@ -18,9 +18,16 @@ internal static class SeasonCalculator
             return premiereDate.Value.Year;
         }
 
+        if (string.IsNullOrEmpty(path))
+        {
+            return null;
+        }
+
         try
         {
-            return File.GetLastWriteTimeUtc(path).Year;
+            // GetLastWriteTimeUtc does not throw for missing files, it returns 1601-01-01.
+            var info = new FileInfo(path);
+            return info.Exists ? info.LastWriteTimeUtc.Year : null;
         }
         catch (IOException)
         {

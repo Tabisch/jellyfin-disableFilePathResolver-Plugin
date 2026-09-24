@@ -52,7 +52,8 @@ public class EnforceSeasonTask : ILibraryPostScanTask
                 Recursive = true
             })
             .OfType<Episode>()
-            .Where(e => config.Matches(e.Path))
+            // Respect items the user locked in the metadata editor.
+            .Where(e => !e.IsLocked && config.Matches(e.Path))
             .ToList();
 
         var touchedSeries = new HashSet<Guid>();
