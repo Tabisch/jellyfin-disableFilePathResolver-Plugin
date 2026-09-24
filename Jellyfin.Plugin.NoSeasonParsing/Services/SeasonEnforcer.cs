@@ -13,7 +13,8 @@ using Microsoft.Extensions.Logging;
 namespace Jellyfin.Plugin.NoSeasonParsing.Services;
 
 /// <summary>
-/// Puts the configured season back on episodes in configured folders. Jellyfin re-parses the
+/// Puts the configured season back on episodes in configured folders (and removes episode
+/// numbers if enabled). Jellyfin re-parses the
 /// season from the path in several places (existing items keep their stored season on rescan,
 /// "Replace all metadata" forces a re-parse, embedded mp4 tags, metadata providers), so this is
 /// applied whenever an episode is saved and again after every library scan.
@@ -58,7 +59,10 @@ public sealed class SeasonEnforcer : IDisposable
         }
 
         var wanted = SeasonCalculator.Get(config, episode.PremiereDate, episode.Path);
-        if (!wanted.HasValue || episode.ParentIndexNumber == wanted)
+        var fixSeason = wanted.HasValue && episode.ParentIndexNumber != wanted;
+        var clearEpisodeNumber = config.DisableEpisodeNumbers
+            && (episode.IndexNumber.HasValue || episode.IndexNumberEnd.HasValue);
+        if (!fixSeason && !clearEpisodeNumber)
         {
             return false;
         }
@@ -71,16 +75,30 @@ public sealed class SeasonEnforcer : IDisposable
 
         try
         {
-            _logger.LogInformation("Season {Old} -> {New}: {Path}", episode.ParentIndexNumber, wanted, episode.Path);
-            episode.ParentIndexNumber = wanted;
+            if (clearEpisodeNumber)
+            {
+                _logger.LogDebug("Episode number {Number} removed: {Path}", episode.IndexNumber, episode.Path);
+                episode.IndexNumber = null;
+                episode.IndexNumberEnd = null;
+            }
 
-            // Link to the matching season if it already exists; otherwise the series refresh creates it.
-            episode.SeasonId = episode.FindSeasonId();
-            episode.SeasonName = episode.FindSeasonName();
+            if (fixSeason)
+            {
+                _logger.LogInformation("Season {Old} -> {New}: {Path}", episode.ParentIndexNumber, wanted, episode.Path);
+                episode.ParentIndexNumber = wanted;
+
+                // Link to the matching season if it already exists; otherwise the series refresh creates it.
+                episode.SeasonId = episode.FindSeasonId();
+                episode.SeasonName = episode.FindSeasonName();
+            }
 
             await episode.UpdateToRepositoryAsync(ItemUpdateType.MetadataEdit, cancellationToken).ConfigureAwait(false);
 
-            ScheduleSeriesRefresh(episode.SeriesId);
+            if (fixSeason)
+            {
+                ScheduleSeriesRefresh(episode.SeriesId);
+            }
+
             return true;
         }
         finally

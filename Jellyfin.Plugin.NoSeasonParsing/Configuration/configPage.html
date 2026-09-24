@@ -6,15 +6,10 @@
 </head>
 <body>
 <div id="NoSeasonParsingConfigPage" data-role="page" class="page type-interior pluginConfigurationPage"
-     data-require="emby-input,emby-button,emby-select,emby-textarea">
+     data-require="emby-input,emby-button,emby-select,emby-textarea,emby-checkbox">
     <div data-role="content">
         <div class="content-primary">
             <form id="NoSeasonParsingConfigForm">
-                <div class="inputContainer">
-                    <label class="textareaLabel" for="Paths">Folders without season parsing (one per line)</label>
-                    <textarea is="emby-textarea" id="Paths" rows="5"></textarea>
-                    <div class="fieldDescription">Paths as Jellyfin sees them, e.g. /media/youtube</div>
-                </div>
                 <div class="selectContainer">
                     <label class="selectLabel" for="SeasonMode">Season assignment</label>
                     <select is="emby-select" id="SeasonMode">
@@ -25,6 +20,18 @@
                 <div class="inputContainer">
                     <label class="inputLabel inputLabelUnfocused" for="FixedSeason">Fixed season number</label>
                     <input is="emby-input" type="number" id="FixedSeason" min="0" />
+                </div>
+                <div class="checkboxContainer checkboxContainer-withDescription">
+                    <label class="emby-checkbox-label">
+                        <input is="emby-checkbox" type="checkbox" id="DisableEpisodeNumbers" />
+                        <span>Disable episode number detection</span>
+                    </label>
+                    <div class="fieldDescription checkboxFieldDescription">Remove episode numbers Jellyfin reads from the filename.</div>
+                </div>
+                <div class="inputContainer">
+                    <label class="textareaLabel" for="Paths">Folders without season parsing (one per line)</label>
+                    <textarea is="emby-textarea" id="Paths" rows="5"></textarea>
+                    <div class="fieldDescription">Paths as Jellyfin sees them, e.g. /media/youtube</div>
                 </div>
                 <button is="emby-button" type="submit" class="raised button-submit block">
                     <span>Save</span>
@@ -41,6 +48,7 @@
                 document.querySelector('#Paths').value = (config.Paths || []).join('\n');
                 document.querySelector('#SeasonMode').value = config.SeasonMode || 'Year';
                 document.querySelector('#FixedSeason').value = config.FixedSeason;
+                document.querySelector('#DisableEpisodeNumbers').checked = config.DisableEpisodeNumbers !== false;
                 Dashboard.hideLoadingMsg();
             });
         });
@@ -54,6 +62,7 @@
                 var fixedSeason = parseInt(document.querySelector('#FixedSeason').value, 10);
                 // 0 is valid (Specials), so only fall back to 1 when the field is empty/invalid.
                 config.FixedSeason = isNaN(fixedSeason) || fixedSeason < 0 ? 1 : fixedSeason;
+                config.DisableEpisodeNumbers = document.querySelector('#DisableEpisodeNumbers').checked;
                 ApiClient.updatePluginConfiguration(NoSeasonParsing.pluginId, config)
                     .then(Dashboard.processPluginConfigurationUpdateResult);
             });

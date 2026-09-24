@@ -23,7 +23,6 @@ To publish a new version, run the Release workflow (Actions -> Release -> Run wo
 4. Scan the library. Episodes already in the library are corrected by the scan too.
 
 ## How it works
-- `FlatEpisodeResolver` runs before the built-in resolvers and creates episodes without parsing the filename.
-- `SeasonEnforcer` puts the configured season back whenever Jellyfin saves an episode (scans, "Refresh metadata", "Replace all metadata"), then refreshes the show so its seasons are rebuilt.
+- `FlatEpisodeResolver` takes over video files in configured folders before Jellyfin's own resolvers: one episode per file, the filename is not parsed for season/episode numbers, and files are never grouped as versions or stacked as parts.
+- `SeasonEnforcer` puts the configured season back (and removes episode numbers, if enabled) whenever Jellyfin saves an episode (scans, "Refresh metadata", "Replace all metadata"), then refreshes the show so its seasons are rebuilt.
 - `EnforceSeasonTask` runs after each library scan and checks every episode in the configured folders.
-- Episode numbers are still read from the filename; only the season is overridden.

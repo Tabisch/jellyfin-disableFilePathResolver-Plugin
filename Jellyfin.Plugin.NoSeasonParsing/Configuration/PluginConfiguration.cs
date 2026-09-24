@@ -23,6 +23,9 @@ public class PluginConfiguration : BasePluginConfiguration
 
     public int FixedSeason { get; set; } = 1;
 
+    /// <summary>Remove episode numbers Jellyfin reads from the filename.</summary>
+    public bool DisableEpisodeNumbers { get; set; } = true;
+
     public bool Matches(string? path)
     {
         if (string.IsNullOrEmpty(path) || Paths.Length == 0)
