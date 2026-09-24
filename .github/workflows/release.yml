@@ -1,18 +1,27 @@
 name: Release
 
-# Push a tag like v1.0.0 to build the plugin and publish it to the plugin repository.
+# Push a tag like v1.0.0, or run this workflow manually with a version, to build the
+# plugin and publish it to the plugin repository.
 # Jellyfin repository URL:
 #   https://github.com/<owner>/<repo>/releases/latest/download/manifest.json
 on:
   push:
     tags:
       - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release, e.g. 1.0.0'
+        required: true
+
+concurrency: release
 
 permissions:
   contents: write
 
 env:
   TARGET_ABI: '12.0.0.0'
+  TAG: ${{ github.event_name == 'workflow_dispatch' && format('v{0}', inputs.version) || github.ref_name }}
 
 jobs:
   release:
@@ -27,7 +36,7 @@ jobs:
       - name: Determine version
         id: version
         run: |
-          v="${GITHUB_REF_NAME#v}"
+          v="${TAG#v}"
           # Jellyfin plugin versions have four parts.
           while [ "$(echo "$v" | tr -cd '.' | wc -c)" -lt 3 ]; do v="$v.0"; done
           echo "version=$v" >> "$GITHUB_OUTPUT"
@@ -56,17 +65,18 @@ jobs:
           python3 build/update_manifest.py manifest.json \
             "${{ steps.version.outputs.version }}" \
             "$TARGET_ABI" \
-            "https://github.com/${GITHUB_REPOSITORY}/releases/download/${GITHUB_REF_NAME}/${{ steps.package.outputs.zip }}" \
+            "https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/${{ steps.package.outputs.zip }}" \
             "${{ steps.package.outputs.checksum }}" \
-            "Release ${GITHUB_REF_NAME}"
+            "Release ${TAG}"
           cat manifest.json
 
       - name: Publish release
         env:
           GH_TOKEN: ${{ github.token }}
         run: >
-          gh release create "$GITHUB_REF_NAME"
+          gh release create "$TAG"
           --repo "$GITHUB_REPOSITORY"
-          --title "$GITHUB_REF_NAME"
+          --target "$GITHUB_SHA"
+          --title "$TAG"
           --generate-notes
           "${{ steps.package.outputs.zip }}" manifest.json
